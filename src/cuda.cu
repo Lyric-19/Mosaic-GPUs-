@@ -25,6 +25,7 @@ unsigned char* d_output_image_data;
 // Pointer to device buffer for the global pixel average sum, this must be passed to a kernel to be used on device
 unsigned long long* d_global_pixel_sum;
 
+int W, C;
 
 void cuda_begin(const Image *input_image) {
     // These are suggested CUDA memory allocations that match the CPU implementation
@@ -32,6 +33,9 @@ void cuda_begin(const Image *input_image) {
 
     cuda_TILES_X = input_image->width / TILE_SIZE;
     cuda_TILES_Y = input_image->height / TILE_SIZE;
+
+    W = input_image->width;
+    C = input_image->channels;
 
     // Allocate buffer for calculating the sum of each tile mosaic
     CUDA_CALL(cudaMalloc(&d_mosaic_sum, cuda_TILES_X * cuda_TILES_Y * input_image->channels * sizeof(unsigned long long)));
@@ -59,34 +63,61 @@ void cuda_begin(const Image *input_image) {
 }
 
 
-__global__ void mosaic_sum(Image cuda_input_image, unsigned char* input_image_data, unsigned long long* d_mosaic_sum) {
-
-    // register int row_r = 0, row_g = 0, row_b = 0;
-
-    int t_index = (blockIdx.y * blockDim.x + blockIdx.x) * cuda_input_image.channels;
-    int t_offset_index = (blockIdx.y * blockDim.x * TILE_SIZE * TILE_SIZE + blockIdx.x * TILE_SIZE) * cuda_input_image.channels;
-    int p_offset_index = (threadIdx.y * TILE_SIZE + threadIdx.x ) * cuda_input_image.channels;
+__global__ void mosaic_sum(int W, int C, unsigned char* input_image_data, unsigned long long* d_mosaic_sum) {
+    /*
+    //  sum the row first
+    int row_r = 0, row_g = 0, row_b = 0;
+    int t_index = (blockIdx.y * W / TILE_SIZE + blockIdx.x) * C;
+    int t_offset_index = (blockIdx.y * W * TILE_SIZE + blockIdx.x * TILE_SIZE + threadIdx.x * W) * C;
+    // int p_offset_index = (threadIdx.y * TILE_SIZE + threadIdx.x ) * parameter[2];
     
-    /*for (int i = 0; i < TILE_SIZE; i++) {
-        row_r += input_image_data[t_offset_index + i*3];
-        row_g += input_image_data[t_offset_index + i*3 + 1];
-        row_b += input_image_data[t_offset_index + i*3 + 2];
+    if (threadIdx.y == 0) {
+        for (int i = 0; i < TILE_SIZE; i++) {
+            row_r += input_image_data[t_offset_index + i * 3];
+        }
+        atomicAdd(&d_mosaic_sum[t_index], row_r);
+        // __syncthreads();
+    }
+
+    if (threadIdx.y == 1) {
+        for (int i = 0; i < TILE_SIZE; i++) {
+            row_g += input_image_data[t_offset_index + i * 3 + 1];
+        }
+        atomicAdd(&d_mosaic_sum[t_index + 1], row_g);
+        // __syncthreads();
+    }
+
+    if (threadIdx.y == 2) {
+        for (int i = 0; i < TILE_SIZE; i++) {
+            row_b += input_image_data[t_offset_index + i * 3 + 2];
+        }
+        atomicAdd(&d_mosaic_sum[t_index + 2], row_b);
+        // __syncthreads();
     }
     */
+    
+    // suffle
+    int t_index = (blockIdx.y * W / TILE_SIZE + blockIdx.x) * C;
+    int t_offset_index = (blockIdx.y * W * TILE_SIZE + blockIdx.x * TILE_SIZE) * C;
+    int p_index = (threadIdx.y * W + threadIdx.x) * C;
+    
+     unsigned long long row_r = input_image_data[t_offset_index + p_index];
+    unsigned long long row_g = input_image_data[t_offset_index + p_index + 1];
+    unsigned long long row_b = input_image_data[t_offset_index + p_index + 2];
 
-    const unsigned char pixel1 = input_image_data[t_offset_index + p_offset_index];
-    const unsigned char pixel2 = input_image_data[t_offset_index + p_offset_index + 1];
-    const unsigned char pixel3 = input_image_data[t_offset_index + p_offset_index + 2];
+    for (int offset = warpSize / 2; offset > 0; offset /= 2) {
+        row_r += __shfl_down(row_r, offset);
+        row_g += __shfl_down(row_g, offset);
+        row_b += __shfl_down(row_b, offset);
+    }
 
-    // atomicAdd(&d_mosaic_sum[t_index], row_r);
-    // atomicAdd(&d_mosaic_sum[t_index + 1], row_g);
-    // atomicAdd(&d_mosaic_sum[t_index + 2], row_b);
+    if (threadIdx.x % 32 == 0) {
+        atomicAdd(&d_mosaic_sum[t_index], row_r);
+        atomicAdd(&d_mosaic_sum[t_index + 1], row_g);
+        atomicAdd(&d_mosaic_sum[t_index + 2], row_b);
 
-    d_mosaic_sum[t_index] += pixel1;
-    d_mosaic_sum[t_index + 1] += pixel2;
-    d_mosaic_sum[t_index + 2] += pixel3;
-    __syncthreads();
-
+    }
+    
 }
 
 
@@ -94,11 +125,13 @@ __global__ void mosaic_sum(Image cuda_input_image, unsigned char* input_image_da
     // Optionally during development call the skip function with the correct inputs to skip this stage
     // skip_tile_sum(input_image, mosaic_sum);
 
-    dim3 blocksPerGrid1(cuda_TILES_X, cuda_TILES_Y, 1);
-    dim3 threadsPerBlock1(TILE_SIZE, TILE_SIZE, 1);
-    mosaic_sum << <blocksPerGrid1, threadsPerBlock1 >> > (cuda_input_image, d_input_image_data, d_mosaic_sum);
-    cudaDeviceSynchronize();
-    checkCUDAError("Stage1");
+     dim3 blocksPerGrid(cuda_TILES_X, cuda_TILES_Y, 1);
+     // dim3 threadsPerBlock(TILE_SIZE, 3, 1);   // add over rows
+     dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE, 1);  // shuffle
+     mosaic_sum << <blocksPerGrid, threadsPerBlock >> > (W, C, d_input_image_data, d_mosaic_sum);
+     cudaDeviceSynchronize();
+     checkCUDAError("Stage1");
+
 
 #ifdef VALIDATION
     // TODO: Uncomment and call the validation function with the correct inputs
@@ -107,74 +140,66 @@ __global__ void mosaic_sum(Image cuda_input_image, unsigned char* input_image_da
     unsigned long long* cuda_mosaic_sum;
     cuda_mosaic_sum = (unsigned long long*)malloc(cuda_TILES_X * cuda_TILES_Y * cuda_input_image.channels * sizeof(unsigned long long));
     CUDA_CALL(cudaMemcpy(cuda_mosaic_sum, d_mosaic_sum, cuda_TILES_X * cuda_TILES_Y * cuda_input_image.channels * sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+    cudaDeviceSynchronize();
     validate_tile_sum(&cuda_input_image, cuda_mosaic_sum);
     free(cuda_mosaic_sum);
 #endif
 }
 
- __global__ void mosaic_ave(Image cuda_input_image, unsigned long long* d_mosaic_sum, unsigned char* d_mosaic_value, unsigned long long* d_global_pixel_sum) {
+ __global__ void mosaic_ave(int W, int C, unsigned long long* d_mosaic_sum, unsigned char* d_mosaic_value, unsigned long long* d_global_pixel_sum) {
 
-     int t_index = (blockIdx.y * blockDim.x + blockIdx.x) * cuda_input_image.channels;
-
-     if (threadIdx.x == 0) {
-        d_mosaic_value[t_index] = (unsigned char)(d_mosaic_sum[t_index] / TILE_PIXELS);
-        d_mosaic_value[t_index + 1] = (unsigned char)(d_mosaic_sum[t_index + 1] / TILE_PIXELS);
-        d_mosaic_value[t_index + 2] = (unsigned char)(d_mosaic_sum[t_index + 2] / TILE_PIXELS);
-
-        atomicAdd(&d_global_pixel_sum[0], d_mosaic_value[t_index]);
-        atomicAdd(&d_global_pixel_sum[1], d_mosaic_value[t_index + 1]);
-        atomicAdd(&d_global_pixel_sum[2], d_mosaic_value[t_index + 2]);
-        // d_global_pixel_sum[0] += d_mosaic_value[t_index];
-        // d_global_pixel_sum[1] += d_mosaic_value[t_index + 1];
-        // d_global_pixel_sum[2] += d_mosaic_value[t_index + 2];
-        
-            
-     }
-
-     __syncthreads();
- }
-     //__shared__ unsigned long long whole_image_sum[4];
      // unsigned int cuda_TILES_X, cuda_TILES_Y;
      // cuda_TILES_X = cuda_input_image.width / TILE_SIZE;
      // cuda_TILES_Y = cuda_input_image.height / TILE_SIZE;
 
+     int row_sum_r = 0, row_sum_g = 0, row_sum_b = 0;
+     int x = blockIdx.x;
+     int thread_index = (threadIdx.x * W / TILE_SIZE + blockIdx.x * W) * C;
+     if (threadIdx.x < W / TILE_SIZE) {
+         for (int i = 0; i < W / TILE_SIZE; ++i) {
+             d_mosaic_value[thread_index + i * 3] = (unsigned char)(d_mosaic_sum[thread_index + i * 3] / TILE_PIXELS);
+             d_mosaic_value[thread_index + i * 3 + 1] = (unsigned char)(d_mosaic_sum[thread_index + i * 3 + 1] / TILE_PIXELS);
+             d_mosaic_value[thread_index + i * 3 + 2] = (unsigned char)(d_mosaic_sum[thread_index + i * 3 + 2] / TILE_PIXELS);
+
+             row_sum_r += d_mosaic_value[thread_index + i * 3];
+             row_sum_g += d_mosaic_value[thread_index + i * 3 + 1];
+             row_sum_b += d_mosaic_value[thread_index + i * 3 + 2];
+         }
+
+
+         atomicAdd(&d_global_pixel_sum[0], row_sum_r);
+         atomicAdd(&d_global_pixel_sum[1], row_sum_g);
+         atomicAdd(&d_global_pixel_sum[2], row_sum_b);
+     }
+
+     //__syncthreads();
      
-     // int t_offset_index = (blockIdx.y * blockDim.x * TILE_SIZE * TILE_SIZE + blockIdx.x * TILE_SIZE) * cuda_input_image.channels;
+ }
 
-     // d_mosaic_value[t_index] = (unsigned char)(d_mosaic_sum[t_index] / TILE_PIXELS);
-     // d_mosaic_value[t_index + 1] = (unsigned char)(d_mosaic_sum[t_index + 1] / TILE_PIXELS);
-     // d_mosaic_value[t_index + 2] = (unsigned char)(d_mosaic_sum[t_index + 2] / TILE_PIXELS);
-   
-     // d_global_pixel_sum[0] += d_mosaic_value[t_index];
-     // d_global_pixel_sum[1] += d_mosaic_value[t_index + 1];
-     // d_global_pixel_sum[2] += d_mosaic_value[t_index + 2];
-   
-    //  __syncthreads();
-
-     // d_output_global_average[0] = (unsigned char)(whole_image_sum[0] / (cuda_TILES_X * cuda_TILES_Y));
-     // d_output_global_average[1] = (unsigned char)(whole_image_sum[1] / (cuda_TILES_X * cuda_TILES_Y));
-     // d_output_global_average[2] = (unsigned char)(whole_image_sum[2] / (cuda_TILES_X * cuda_TILES_Y));
- 
-
-
-
+    
 void cuda_stage2(unsigned char* output_global_average) {
     // Optionally during development call the skip function with the correct inputs to skip this stage
     // skip_compact_mosaic(cuda_TILES_X, cuda_TILES_Y, d_mosaic_sum, compact_mosaic, global_pixel_average);
-    // CUDA_CALL(cudaMalloc(&d_whole_image_sum, 4 * sizeof(unsigned long long)));
     unsigned long long whole_image_sum[4] = { 0,0,0,0 };
-    dim3 blocksPerGrid(cuda_TILES_X, cuda_TILES_Y, 1);
+
+    int block_num = (int)(cuda_TILES_X / TILE_SIZE);
+
+    if (block_num == 0) {
+        block_num = 1;
+    }
+    dim3 blocksPerGrid(block_num, 1, 1);
     dim3 threadsPerBlock(TILE_SIZE, 1, 1);
-    mosaic_ave << <blocksPerGrid, threadsPerBlock >> > (cuda_input_image, d_mosaic_sum, d_mosaic_value, d_global_pixel_sum);
+    mosaic_ave << <blocksPerGrid, threadsPerBlock >> > (W, C, d_mosaic_sum, d_mosaic_value, d_global_pixel_sum);
     cudaDeviceSynchronize();
     checkCUDAError("Stage2");
-    
     CUDA_CALL(cudaMemcpy(&whole_image_sum, d_global_pixel_sum, cuda_input_image.channels * sizeof(unsigned long long), cudaMemcpyDeviceToHost));
     cudaDeviceSynchronize();
+
     output_global_average[0] = (unsigned char)(whole_image_sum[0] / (cuda_TILES_X * cuda_TILES_Y));
     output_global_average[1] = (unsigned char)(whole_image_sum[1] / (cuda_TILES_X * cuda_TILES_Y));
     output_global_average[2] = (unsigned char)(whole_image_sum[2] / (cuda_TILES_X * cuda_TILES_Y));
 
+    CUDA_CALL(cudaFree(d_global_pixel_sum));
 
 #ifdef VALIDATION
     // TODO: Uncomment and call the validation functions with the correct inputs
@@ -191,25 +216,31 @@ void cuda_stage2(unsigned char* output_global_average) {
 #endif    
 }
 
-__global__ void mosaic_broad(Image cuda_input_image, unsigned char* d_mosaic_value, unsigned char* d_output_image_data) {
+__global__ void mosaic_broad(int W, int C, unsigned char* d_mosaic_value, unsigned char* d_output_image_data) {
 
-    
-    int t_index = (blockIdx.y * blockDim.x + blockIdx.x) * cuda_input_image.channels;
-    int t_offset_index = (blockIdx.y * blockDim.x * TILE_SIZE * TILE_SIZE + blockIdx.x * TILE_SIZE) * cuda_input_image.channels;
-    int p_offset_index = (threadIdx.y * TILE_SIZE + threadIdx.x) * cuda_input_image.channels;
+    __shared__ unsigned char value_r, value_g, value_b;
+    int t_index = (blockIdx.y * W / TILE_SIZE + blockIdx.x) * C;
+    int t_offset_index = (blockIdx.y * W * TILE_SIZE + blockIdx.x * TILE_SIZE) * C;
+    int p_offset_index = (threadIdx.y * W + threadIdx.x) * C;
 
-    d_output_image_data[t_offset_index + p_offset_index] = d_mosaic_value[t_index];
-    d_output_image_data[t_offset_index + p_offset_index + 1] = d_mosaic_value[t_index + 1];
-    d_output_image_data[t_offset_index + p_offset_index + 2] = d_mosaic_value[t_index + 2];
-   // __syncthreads();
+
+    value_r = d_mosaic_value[t_index];
+    value_g = d_mosaic_value[t_index + 1];
+    value_b = d_mosaic_value[t_index + 2];
+
+    d_output_image_data[t_offset_index + p_offset_index] = value_r;
+    d_output_image_data[t_offset_index + p_offset_index + 1] = value_g;
+    d_output_image_data[t_offset_index + p_offset_index + 2] = value_b;
+    __syncthreads();
 }
 
 void cuda_stage3() {
     // Optionally during development call the skip function with the correct inputs to skip this stage
     // skip_broadcast(input_image, compact_mosaic, output_image);
-    dim3 blocksPerGrid(cuda_TILES_X, cuda_TILES_Y, 1);
-    dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE, 1);
-    mosaic_broad << <blocksPerGrid, threadsPerBlock >> > (cuda_input_image, d_mosaic_value, d_output_image_data);
+
+    dim3 blocksPerGrid2(cuda_TILES_X, cuda_TILES_Y, 1);
+    dim3 threadsPerBlock2(TILE_SIZE, TILE_SIZE, 1);
+    mosaic_broad << <blocksPerGrid2, threadsPerBlock2 >> > (W, C, d_mosaic_value, d_output_image_data);
     cudaDeviceSynchronize();
     checkCUDAError("Stage3");
 
