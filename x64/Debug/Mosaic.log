@@ -1,0 +1,35 @@
+﻿  Compiling CUDA source file src\main.cu...
+  Compiling CUDA source file src\cuda.cu...
+  
+  U:\ManWin\My Documents\GPUs\COMCUDA_2022-master>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\bin\nvcc.exe" -gencode=arch=compute_61,code=\"sm_61,compute_61\" --use-local-env -ccbin "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.29.30133\bin\HostX86\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include" -I"U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\\" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include"  -G   --keep-dir x64\Debug -maxrregcount=0  --machine 64 --compile -cudart static  -g   -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Fdx64\Debug\vc142.pdb /FS /Zi /RTC1 /MDd " -o x64\Debug\main.cu.obj "U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\main.cu" 
+  
+  U:\ManWin\My Documents\GPUs\COMCUDA_2022-master>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\bin\nvcc.exe" -gencode=arch=compute_61,code=\"sm_61,compute_61\" --use-local-env -ccbin "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.29.30133\bin\HostX86\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include" -I"U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\\" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include"  -G   --keep-dir x64\Debug -maxrregcount=0  --machine 64 --compile -cudart static  -g   -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Fdx64\Debug\vc142.pdb /FS /Zi /RTC1 /MDd " -o x64\Debug\cuda.cu.obj "U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\cuda.cu" 
+  cuda.cu
+  main.cu
+  cpu.c
+  helper.c
+  openmp.c
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(41,9): warning C4849: OpenMP 'collapse' clause ignored in 'parallel for' directive
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(42,24): warning C4018: '<': signed/unsigned mismatch
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(43,27): warning C4018: '<': signed/unsigned mismatch
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(36,14): warning C4101: 't_y': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(38,27): warning C4101: 'pixel2': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(36,24): warning C4101: 'p_y': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(37,43): warning C4101: 'pixel_offset': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(38,19): warning C4101: 'pixel1': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(37,30): warning C4101: 'tile_offset': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(37,18): warning C4101: 'tile_index': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(36,19): warning C4101: 'p_x': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(38,35): warning C4101: 'pixel3': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(80,19): warning C4018: '<': signed/unsigned mismatch
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(109,9): warning C4849: OpenMP 'collapse' clause ignored in 'parallel for' directive
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(110,23): warning C4018: '<': signed/unsigned mismatch
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(111,28): warning C4018: '<': signed/unsigned mismatch
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(106,14): warning C4101: 't_y': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(106,24): warning C4101: 'p_y': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(107,30): warning C4101: 'tile_offset': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(107,18): warning C4101: 'tile_index': unreferenced local variable
+U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\openmp.c(106,19): warning C4101: 'p_x': unreferenced local variable
+  Generating Code...
+     Creating library U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\x64\Debug\Mosaic.lib and object U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\x64\Debug\Mosaic.exp
+  Mosaic.vcxproj -> U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\x64\Debug\Mosaic.exe

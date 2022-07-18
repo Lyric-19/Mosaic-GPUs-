@@ -1,0 +1,10 @@
+﻿  Compiling CUDA source file src\cuda.cu...
+  
+  U:\ManWin\My Documents\GPUs\COMCUDA_2022-master>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\bin\nvcc.exe" -gencode=arch=compute_61,code=\"sm_61,compute_61\" --use-local-env -ccbin "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.29.30133\bin\HostX86\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include" -I"U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\\" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\include"     --keep-dir x64\Release -maxrregcount=0  --machine 64 --compile -cudart static     -DWIN32 -DWIN64 -DNDEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /O2 /Fdx64\Release\vc142.pdb /FS   /MD " -o x64\Release\cuda.cu.obj "U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\src\cuda.cu" 
+  cuda.cu
+     Creating library U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\x64\Release\Mosaic.lib and object U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\x64\Release\Mosaic.exp
+  Generating code
+  Previous IPDB and IOBJ mismatch, fall back to full compilation.
+  All 23 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  Mosaic.vcxproj -> U:\ManWin\My Documents\GPUs\COMCUDA_2022-master\x64\Release\Mosaic.exe
